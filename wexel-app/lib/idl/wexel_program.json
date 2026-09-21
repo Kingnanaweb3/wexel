@@ -1,0 +1,341 @@
+{
+  "address": "8kUZWkfcVpwv55LrjrnSAm5q67zV2dnn3xGqJrfqEnz5",
+  "metadata": {
+    "name": "wexel_program",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "cancel_rule",
+      "discriminator": [
+        152,
+        13,
+        102,
+        19,
+        188,
+        206,
+        187,
+        81
+      ],
+      "accounts": [
+        {
+          "name": "rule",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "rule"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "confirm_execution",
+      "discriminator": [
+        34,
+        75,
+        247,
+        73,
+        89,
+        127,
+        101,
+        123
+      ],
+      "accounts": [
+        {
+          "name": "rule",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "signer": true,
+          "relations": [
+            "rule"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_rule",
+      "discriminator": [
+        225,
+        163,
+        1,
+        6,
+        230,
+        91,
+        203,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "rule",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "asset",
+          "type": "string"
+        },
+        {
+          "name": "direction",
+          "type": {
+            "defined": {
+              "name": "Direction"
+            }
+          }
+        },
+        {
+          "name": "threshold_pct",
+          "type": "f64"
+        },
+        {
+          "name": "entry_price",
+          "type": "f64"
+        },
+        {
+          "name": "action",
+          "type": {
+            "defined": {
+              "name": "Action"
+            }
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "max_execution",
+          "type": "u64"
+        },
+        {
+          "name": "max_slippage_bps",
+          "type": "u16"
+        },
+        {
+          "name": "expiry_unix",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "execute_rule",
+      "discriminator": [
+        143,
+        36,
+        13,
+        104,
+        240,
+        240,
+        207,
+        192
+      ],
+      "accounts": [
+        {
+          "name": "rule",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "reported_price",
+          "type": "f64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Rule",
+      "discriminator": [
+        82,
+        10,
+        53,
+        40,
+        250,
+        61,
+        143,
+        130
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "RuleNotActive",
+      "msg": "Rule is not in a state where it can be executed"
+    },
+    {
+      "code": 6001,
+      "name": "PriceOutOfRange",
+      "msg": "Price is outside the plausible range for this rule"
+    },
+    {
+      "code": 6002,
+      "name": "BadPrice",
+      "msg": "Price must be positive"
+    },
+    {
+      "code": 6003,
+      "name": "BadThreshold",
+      "msg": "Threshold must be between 0 and 100 percent"
+    },
+    {
+      "code": 6004,
+      "name": "BadAmount",
+      "msg": "Amount must be greater than zero"
+    },
+    {
+      "code": 6005,
+      "name": "BadSlippage",
+      "msg": "Slippage cannot exceed 10%"
+    }
+  ],
+  "types": [
+    {
+      "name": "Action",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Buy"
+          },
+          {
+            "name": "SwapToUsdc"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Direction",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Up"
+          },
+          {
+            "name": "Down"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Rule",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset",
+            "type": "string"
+          },
+          {
+            "name": "direction",
+            "type": {
+              "defined": {
+                "name": "Direction"
+              }
+            }
+          },
+          {
+            "name": "threshold_pct",
+            "type": "f64"
+          },
+          {
+            "name": "entry_price",
+            "type": "f64"
+          },
+          {
+            "name": "action",
+            "type": {
+              "defined": {
+                "name": "Action"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "max_execution",
+            "type": "u64"
+          },
+          {
+            "name": "max_slippage_bps",
+            "type": "u16"
+          },
+          {
+            "name": "expiry_unix",
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "RuleStatus"
+              }
+            }
+          },
+          {
+            "name": "last_price",
+            "type": "f64"
+          },
+          {
+            "name": "executed_amount",
+            "type": "u64"
+          },
+          {
+            "name": "triggered_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RuleStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Watching"
+          },
+          {
+            "name": "Triggered"
+          },
+          {
+            "name": "Executed"
+          },
+          {
+            "name": "Expired"
+          },
+          {
+            "name": "Cancelled"
+          }
+        ]
+      }
+    }
+  ]
+}

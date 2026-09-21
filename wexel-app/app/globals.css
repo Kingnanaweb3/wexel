@@ -1,0 +1,230 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,100..1000&family=Geist+Mono:wght@100..900&display=swap');
+@import "tailwindcss";
+
+/* LIGHT (default) — mirrors the reference: soft grey page, white cards */
+:root {
+  color-scheme: light;
+
+  --bg:      #EFEFF0;
+  --surface: #FFFFFF;
+  --raised:  #F7F7F8;
+  --ink:     #111113;
+  --muted:   #6B6B72;
+  --faint:   #9B9BA3;
+  --line:    rgba(0,0,0,.07);
+  --accent:  #2F7FFF;
+  --ink-inv: #FFFFFF;
+  --navpill: #111113;
+  --selected: rgba(0,0,0,.07);
+  --idle: rgba(0,0,0,.025);
+
+  --good: #17B26A;
+  --warn: #E0A85A;
+  --bad:  #E5484D;
+
+  --shadow-card: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px -16px rgba(0,0,0,.14);
+  --shadow-nav:  0 8px 30px -8px rgba(0,0,0,.18);
+
+  --sans: 'DM Sans', -apple-system, system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg:      #0C0C0C;
+  --surface: #171715;
+  --raised:  #1F1F1D;
+  --ink:     #FBFBF7;
+  --muted:   #B5B3AA;
+  --faint:   #6E6C66;
+  --line:    rgba(255,255,255,.10);
+  --accent:  #4C8DFF;
+  --ink-inv: #0C0C0C;
+  --navpill: #FBFBF7;
+  --selected: rgba(255,255,255,.11);
+  --idle: rgba(255,255,255,.035);
+
+  --good: #5DD68E;
+  --warn: #E0A85A;
+  --bad:  #F87171;
+
+  --shadow-card: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+  --shadow-nav:  0 10px 34px -10px rgba(0,0,0,.7);
+}
+
+* { box-sizing: border-box; }
+html, body { overflow-x: clip; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-weight: 400;
+  letter-spacing: -0.3px;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  padding-top: env(safe-area-inset-top, 0px);
+  transition: background 240ms ease, color 240ms ease;
+}
+
+h1, h2, h3 {
+  font-family: var(--mono);
+  font-weight: 400;
+  letter-spacing: -0.5px;
+  line-height: 0.98;
+  margin: 0;
+}
+h1 { font-size: 30px; text-wrap: balance; }
+h2 { font-size: 20px; }
+h3 { font-size: 16px; }
+
+.num { font-variant-numeric: tabular-nums; letter-spacing: -0.6px; }
+.mono { font-family: var(--mono); letter-spacing: 0; }
+
+.label {
+  font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint);
+}
+
+/* Cards — the reference's soft white panels */
+.card {
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+}
+
+.tile {
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 15px;
+  box-shadow: var(--shadow-card);
+  text-align: left;
+  border: 0;
+  cursor: pointer;
+  width: 100%;
+  color: inherit;
+  font-family: var(--sans);
+  transition: transform 180ms ease;
+}
+.tile:active { transform: scale(0.975); }
+
+.icon-chip {
+  width: 34px; height: 34px; border-radius: 11px;
+  display: grid; place-items: center;
+  background: var(--raised);
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+button { font-family: var(--sans); letter-spacing: -0.3px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  font-size: 15px; font-weight: 500;
+  padding: 15px 20px; border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink);
+  cursor: pointer; width: 100%;
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+.btn:active:not(:disabled) { transform: scale(0.985); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-primary {
+  background: var(--navpill); color: var(--ink-inv);
+  border-color: transparent;
+}
+
+input, select {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 14px;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  letter-spacing: -0.3px;
+  width: 100%;
+}
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+select option { background: var(--surface); color: var(--ink); }
+
+/* Floating pill nav, like the reference */
+.tabbar {
+  position: fixed; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  left: 50%; transform: translateX(-50%);
+  z-index: 40;
+  display: flex; gap: 2px;
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 7px;
+  box-shadow: var(--shadow-nav);
+  width: min(calc(100% - 32px), 400px);
+}
+.tabbar a {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 4px; border-radius: 999px;
+  text-decoration: none; color: var(--faint);
+  font-size: 9.5px; font-family: var(--mono); letter-spacing: 0;
+  transition: background 200ms ease, color 200ms ease;
+}
+.tabbar a.on {
+  background: var(--navpill);
+  color: var(--ink-inv);
+}
+
+/* Segmented control */
+.seg {
+  display: flex; gap: 3px; padding: 4px;
+  background: var(--surface); border-radius: 14px;
+  box-shadow: var(--shadow-card);
+}
+.seg button {
+  flex: 1; padding: 10px; border: 0; border-radius: 11px; cursor: pointer;
+  background: transparent; color: var(--faint);
+  font-size: 13.5px; font-weight: 500;
+  transition: background 180ms, color 180ms;
+}
+.seg button.on { background: var(--selected); color: var(--ink); }
+
+/* Swipe rows */
+.swipe {
+  display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
+  gap: 12px; padding-inline: 20px; margin-inline: -20px;
+  scrollbar-width: none; padding-bottom: 4px;
+}
+.swipe::-webkit-scrollbar { display: none; }
+.swipe > * { flex: 0 0 148px; scroll-snap-align: start; }
+
+/* Sheet */
+.sheet-bg {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(0,0,0,.45); backdrop-filter: blur(3px);
+  display: flex; align-items: flex-end;
+  animation: fade .2s ease;
+}
+.sheet {
+  width: 100%; max-width: 430px; margin: 0 auto;
+  background: var(--bg);
+  border-radius: 24px 24px 0 0;
+  padding: 16px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  max-height: 90svh; overflow-y: auto;
+  animation: rise .28s cubic-bezier(.16,1,.3,1);
+}
+.grab { width: 36px; height: 4px; border-radius: 2px; margin: 0 auto 18px;
+        background: var(--line); }
+
+@keyframes fade { from { opacity: 0 } }
+@keyframes rise { from { transform: translateY(100%) } }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+@keyframes spin { to { transform: rotate(360deg) } }
+
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
