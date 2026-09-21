@@ -24,6 +24,7 @@ custom-panic = []
 anchor-lang = "1.2.0"
 anchor-spl = "1.2.0"
 solana-instructions-sysvar = "3.0.1"
+spl-token-2022-interface = "2.1.0"
 
 
 [lints.rust]

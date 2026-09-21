@@ -1,198 +1,208 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { VersionedTransaction } from "@solana/web3.js";
+import { Check, ExternalLink, Info } from "lucide-react";
+import { IS_DEVNET, explorerTx } from "@/lib/network";
 
-const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-const SOL = "So11111111111111111111111111111111111111112";
+const PAY = [
+  { symbol: "USDC", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6 },
+  { symbol: "SOL",  mint: "So11111111111111111111111111111111111111112", decimals: 9 },
+];
+const AMOUNTS = ["10", "25", "50"];
+const SLIPPAGE = [50, 100, 300];
 
 type Props = {
-  ticker: string;
-  mint: string;
-  price: number;
-  canAutomate: boolean;
-  onClose: () => void;
+  ticker: string; mint: string; price: number;
+  canAutomate: boolean; decimals?: number; onClose: () => void;
 };
 
-export function BuySheet({ ticker, mint, price, canAutomate, onClose }: Props) {
+// Turns wallet/RPC errors into something a person can act on — and always
+// says whether money moved.
+function friendly(e: any): string {
+  const m = String(e?.message ?? e ?? "").toLowerCase();
+  if (m.includes("rejected")) return "Cancelled in your wallet. Nothing was spent.";
+  if (m.includes("address table") || m.includes("blockhash not found"))
+    return "This network can't run the trade. Nothing was spent.";
+  if (m.includes("0x1771") || m.includes("slippage"))
+    return "Price moved more than your slippage limit. Nothing was spent — try again or allow more slippage.";
+  if (m.includes("insufficient") || m.includes("0x1"))
+    return "Not enough balance for this trade, including fees. Nothing was spent.";
+  return "Trade didn't go through. Nothing left your wallet.";
+}
+
+export function BuySheet({ ticker, mint, price, canAutomate, decimals, onClose }: Props) {
   const { connection } = useConnection();
   const { publicKey, signTransaction } = useWallet();
 
-  const [payWith, setPayWith] = useState(USDC);
+  const [pay, setPay] = useState(PAY[0]);
   const [amount, setAmount] = useState("25");
-  const [slippage, setSlippage] = useState("100"); // basis points = 1%
+  const [slippage, setSlippage] = useState(100);
   const [quote, setQuote] = useState<any>(null);
-  const [status, setStatus] = useState("");
+  const [quoteError, setQuoteError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [sig, setSig] = useState("");
 
-  // Ask Jupiter what this trade would actually get you, whenever inputs change.
+  // Live quote, debounced so typing doesn't spam the API.
   useEffect(() => {
-    const value = Number(amount);
-    if (!value || value <= 0) { setQuote(null); return; }
-
-    const timer = setTimeout(async () => {
+    const v = Number(amount);
+    setQuote(null); setQuoteError("");
+    if (!v || v <= 0) return;
+    const t = setTimeout(async () => {
       try {
-        setStatus("finding best route…");
-        // Input decimals: USDC is 6, SOL is 9.
-        const decimals = payWith === SOL ? 9 : 6;
-        const raw = Math.floor(value * 10 ** decimals);
-
-        const res = await fetch(
-          `/api/quote?inputMint=${payWith}&outputMint=${mint}&amount=${raw}&slippageBps=${slippage}`
-        );
-        if (!res.ok) throw new Error("no route");
+        const raw = Math.floor(v * 10 ** pay.decimals);
+        const res = await fetch(`/api/quote?inputMint=${pay.mint}&outputMint=${mint}&amount=${raw}&slippageBps=${slippage}`);
+        if (!res.ok) throw new Error();
         setQuote(await res.json());
-        setStatus("");
       } catch {
-        setQuote(null);
-        setStatus("no route for this pair");
+        setQuoteError(`No route from ${pay.symbol} to ${ticker} right now.`);
       }
-    }, 400); // debounce so typing doesn't spam the API
-
-    return () => clearTimeout(timer);
-  }, [payWith, amount, slippage, mint]);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [pay, amount, slippage, mint, ticker]);
 
   async function buy() {
     if (!publicKey || !signTransaction || !quote) return;
-    setBusy(true);
+    setBusy(true); setError("");
     try {
-      setStatus("building transaction…");
       const res = await fetch("/api/swap", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quote, user: publicKey.toBase58() }),
       });
+      if (!res.ok) throw new Error("build failed");
       const { swapTransaction } = await res.json();
 
-      const tx = VersionedTransaction.deserialize(
-        Buffer.from(swapTransaction, "base64")
-      );
-
-      setStatus("approve in your wallet…");
+      const tx = VersionedTransaction.deserialize(Buffer.from(swapTransaction, "base64"));
       const signed = await signTransaction(tx);
-
-      setStatus("sending…");
-      const sig = await connection.sendRawTransaction(signed.serialize(), {
-        skipPreflight: false,
-        maxRetries: 3,
-      });
-
-      setStatus("confirming…");
-      await connection.confirmTransaction(sig, "confirmed");
-      setStatus(`done — ${sig.slice(0, 8)}…`);
-    } catch (e: any) {
-      setStatus(e.message ?? "failed");
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+      const s = await connection.sendRawTransaction(signed.serialize(), { maxRetries: 3 });
+      await connection.confirmTransaction({ signature: s, blockhash, lastValidBlockHeight }, "confirmed");
+      setSig(s);
+    } catch (e) {
+      setError(friendly(e));
     } finally {
       setBusy(false);
     }
   }
 
-  const outAmount = quote
-    ? Number(quote.outAmount) / 10 ** (quote.outputDecimals ?? 8)
-    : 0;
   const impact = quote ? Number(quote.priceImpactPct) * 100 : 0;
+  const shares = quote && decimals !== undefined ? Number(quote.outAmount) / 10 ** decimals : null;
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 50,
-        background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "flex-end",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%", background: "#0E0C16",
-          borderTop: "1px solid var(--hair)",
-          borderRadius: "22px 22px 0 0",
-          padding: "20px 20px calc(24px + env(safe-area-inset-bottom, 0px))",
-          maxHeight: "88vh", overflowY: "auto",
-        }}
-      >
-        <div style={{
-          width: 36, height: 4, borderRadius: 2, margin: "0 auto 18px",
-          background: "rgba(255,255,255,0.15)",
-        }} />
+    <div className="sheet-bg" onClick={onClose}>
+      <div className="sheet" onClick={e => e.stopPropagation()}>
+        <div className="grab" />
 
-        <h2 style={{ fontSize: 22, marginBottom: 3 }}>Buy {ticker}</h2>
-        <div className="mono" style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 20 }}>
-          ${price.toLocaleString(undefined, { maximumFractionDigits: 2 })} per share
-        </div>
-
-        <label className="mono-label">Pay with</label>
-        <select value={payWith} onChange={(e) => setPayWith(e.target.value)}
-                style={{ marginTop: 8, marginBottom: 14 }}>
-          <option value={USDC}>USDC</option>
-          <option value={SOL}>SOL</option>
-        </select>
-
-        <label className="mono-label">Amount</label>
-        <input type="number" inputMode="decimal" value={amount}
-               onChange={(e) => setAmount(e.target.value)}
-               style={{ marginTop: 8, marginBottom: 14 }} />
-
-        <label className="mono-label">Max slippage</label>
-        <select value={slippage} onChange={(e) => setSlippage(e.target.value)}
-                style={{ marginTop: 8, marginBottom: 18 }}>
-          <option value="50">0.5% — strict</option>
-          <option value="100">1% — normal</option>
-          <option value="300">3% — thin liquidity</option>
-        </select>
-
-        {quote && (
-          <div className="card" style={{ marginBottom: 16 }}>
-            <Row label="You receive" value={`${outAmount.toFixed(6)} ${ticker}x`} />
-            <Row
-              label="Price impact"
-              value={`${impact.toFixed(2)}%`}
-              tone={impact > 2 ? "bad" : undefined}
-            />
-            <Row label="Route" value={`${quote.routePlan?.length ?? 1} hop(s)`} />
+        {sig ? (
+          <div style={{ textAlign: "center", padding: "10px 0 4px" }}>
+            <div style={{ width: 54, height: 54, borderRadius: "50%", margin: "0 auto 16px", display: "grid",
+                          placeItems: "center", background: "var(--selected)", color: "var(--good)" }}>
+              <Check size={26} />
+            </div>
+            <h2 style={{ fontSize: 20, marginBottom: 6 }}>Bought {ticker}</h2>
+            <p className="num" style={{ fontSize: 13.5, color: "var(--muted)", margin: "0 0 20px" }}>
+              {shares !== null ? `${shares.toFixed(6)} ${ticker}` : `$${amount} of ${ticker}`} is in your wallet.
+            </p>
+            <a href={explorerTx(sig)} target="_blank" rel="noreferrer" style={{
+              display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13,
+              color: "var(--accent)", textDecoration: "none", marginBottom: 20,
+            }}>View on explorer <ExternalLink size={13} /></a>
+            <button className="btn" onClick={onClose}>Done</button>
           </div>
-        )}
+        ) : (
+          <>
+            <h2 style={{ fontSize: 20, marginBottom: 4 }}>Buy {ticker}</h2>
+            <p className="num" style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 20px" }}>
+              ${price.toLocaleString(undefined, { maximumFractionDigits: 2 })} per share
+            </p>
 
-        {!canAutomate && (
-          <div style={{
-            fontSize: 12.5, color: "var(--warn)", marginBottom: 16,
-            lineHeight: 1.5,
-          }}>
-            Pre-IPO prices move on single trades, so Wexel won't automate this one.
-            You can still buy and hold it.
-          </div>
-        )}
+            <div className="label" style={{ marginBottom: 8 }}>Pay with</div>
+            <div style={{ display: "flex", gap: 7, marginBottom: 18 }}>
+              {PAY.map(p => (
+                <button key={p.symbol} onClick={() => setPay(p)} style={chip(pay.symbol === p.symbol)}>{p.symbol}</button>
+              ))}
+            </div>
 
-        <button
-          className="pill pill-primary"
-          style={{ width: "100%", justifyContent: "center", padding: "14px" }}
-          disabled={!publicKey || !quote || busy}
-          onClick={buy}
-        >
-          {!publicKey ? "Connect wallet" : busy ? "Working…" : `Buy ${ticker}`}
-        </button>
+            <div className="label" style={{ marginBottom: 8 }}>Amount ({pay.symbol})</div>
+            <div style={{ display: "flex", gap: 7, marginBottom: 18 }}>
+              {pay.symbol === "USDC" && AMOUNTS.map(a => (
+                <button key={a} onClick={() => setAmount(a)} style={chip(amount === a)}>${a}</button>
+              ))}
+              <input type="number" inputMode="decimal" value={amount}
+                     onChange={e => setAmount(e.target.value)}
+                     className="num" style={{ flex: 1.4, padding: "10px 12px", fontSize: 14, borderRadius: 11 }} />
+            </div>
 
-        {status && (
-          <div className="mono" style={{
-            fontSize: 12, color: "var(--text-3)", marginTop: 12, textAlign: "center",
-          }}>{status}</div>
+            <div className="label" style={{ marginBottom: 8 }}>Max slippage</div>
+            <div style={{ display: "flex", gap: 7, marginBottom: 20 }}>
+              {SLIPPAGE.map(s => (
+                <button key={s} onClick={() => setSlippage(s)} style={chip(slippage === s)}>{s / 100}%</button>
+              ))}
+            </div>
+
+            <div className="card" style={{ padding: "4px 16px", marginBottom: 14, minHeight: 50 }}>
+              {quote ? (
+                <>
+                  <Row label="You receive" value={shares !== null ? `≈ ${shares.toFixed(6)} ${ticker}` : `≈ $${amount} of ${ticker}`} />
+                  <Row label="Price impact" value={`${impact.toFixed(2)}%`} tone={impact > 2 ? "var(--bad)" : undefined} />
+                  <Row label="Route" value={`${quote.routePlan?.length ?? 1} step${quote.routePlan?.length === 1 ? "" : "s"}`} last />
+                </>
+              ) : (
+                <div style={{ padding: "14px 0", fontSize: 13, color: quoteError ? "var(--warn)" : "var(--faint)" }}>
+                  {quoteError || (Number(amount) > 0 ? "Finding the best price…" : "Enter an amount")}
+                </div>
+              )}
+            </div>
+
+            {!canAutomate && (
+              <p style={{ fontSize: 12.5, color: "var(--warn)", lineHeight: 1.55, margin: "0 0 14px" }}>
+                Pre-IPO prices move on single trades, so Wexel won't automate this one. You can still buy and hold it.
+              </p>
+            )}
+
+            {IS_DEVNET && (
+              <div style={{ display: "flex", gap: 8, fontSize: 12.5, color: "var(--muted)", lineHeight: 1.55, marginBottom: 14 }}>
+                <Info size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                You're on devnet. This is a live mainnet quote, but real stocks can only be bought on mainnet.
+              </div>
+            )}
+
+            <button className="btn btn-primary" disabled={IS_DEVNET || !publicKey || !quote || busy} onClick={buy}>
+              {IS_DEVNET ? "Buying needs mainnet"
+                : !publicKey ? "Connect wallet"
+                : busy ? "Approve in your wallet…"
+                : `Buy ${ticker}`}
+            </button>
+
+            {error && (
+              <p style={{ fontSize: 12.5, color: "var(--warn)", lineHeight: 1.55, textAlign: "center", margin: "12px 0 0" }}>
+                {error}
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>
   );
 }
 
-function Row({ label, value, tone }: { label: string; value: string; tone?: string }) {
+function chip(on: boolean): React.CSSProperties {
+  return {
+    flex: 1, padding: "10px 6px", borderRadius: 11, cursor: "pointer", fontSize: 13,
+    fontFamily: "var(--sans)", border: 0,
+    background: on ? "var(--selected)" : "var(--idle)",
+    color: on ? "var(--ink)" : "var(--muted)", fontWeight: on ? 500 : 400,
+  };
+}
+
+function Row({ label, value, tone, last }: { label: string; value: string; tone?: string; last?: boolean }) {
   return (
-    <div style={{
-      display: "flex", justifyContent: "space-between",
-      padding: "7px 0", fontSize: 13,
-    }}>
-      <span style={{ color: "var(--text-3)" }}>{label}</span>
-      <span className="mono" style={{ color: tone === "bad" ? "var(--bad)" : "var(--text)" }}>
-        {value}
-      </span>
+    <div style={{ display: "flex", justifyContent: "space-between", padding: "11px 0", fontSize: 13,
+                  borderBottom: last ? "none" : "1px solid var(--line)" }}>
+      <span style={{ color: "var(--faint)" }}>{label}</span>
+      <span className="num" style={{ color: tone ?? "var(--ink)" }}>{value}</span>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 {
-  "address": "8kUZWkfcVpwv55LrjrnSAm5q67zV2dnn3xGqJrfqEnz5",
+  "address": "4RuFJCqBiGmWee9WTtD91dbGQQiCUjoSkkkqXBvi3Yda",
   "metadata": {
     "name": "wexel_program",
     "version": "0.1.0",
@@ -18,33 +18,6 @@
         206,
         187,
         81
-      ],
-      "accounts": [
-        {
-          "name": "rule",
-          "writable": true
-        },
-        {
-          "name": "owner",
-          "signer": true,
-          "relations": [
-            "rule"
-          ]
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "confirm_execution",
-      "discriminator": [
-        34,
-        75,
-        247,
-        73,
-        89,
-        127,
-        101,
-        123
       ],
       "accounts": [
         {
@@ -133,25 +106,92 @@
         {
           "name": "expiry_unix",
           "type": "i64"
+        },
+        {
+          "name": "input_mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "output_mint",
+          "type": "pubkey"
         }
       ]
     },
     {
-      "name": "execute_rule",
+      "name": "execute",
       "discriminator": [
-        143,
-        36,
+        130,
+        221,
+        242,
+        154,
         13,
-        104,
-        240,
-        240,
-        207,
-        192
+        193,
+        189,
+        29
       ],
       "accounts": [
         {
           "name": "rule",
           "writable": true
+        },
+        {
+          "name": "authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "input_mint",
+          "relations": [
+            "rule"
+          ]
+        },
+        {
+          "name": "output_mint",
+          "relations": [
+            "rule"
+          ]
+        },
+        {
+          "name": "user_input",
+          "writable": true
+        },
+        {
+          "name": "keeper_input",
+          "writable": true
+        },
+        {
+          "name": "user_output"
+        },
+        {
+          "name": "keeper",
+          "signer": true,
+          "address": "8CuBSCDhqT1xovkZY3jpa2ft5gpLYEZbiG3BikoogvnT"
+        },
+        {
+          "name": "input_token_program"
+        },
+        {
+          "name": "output_token_program"
+        },
+        {
+          "name": "instructions",
+          "address": "Sysvar1nstructions1111111111111111111111111"
         }
       ],
       "args": [
@@ -160,6 +200,38 @@
           "type": "f64"
         }
       ]
+    },
+    {
+      "name": "settle",
+      "discriminator": [
+        175,
+        42,
+        185,
+        87,
+        144,
+        131,
+        102,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "rule",
+          "writable": true
+        },
+        {
+          "name": "output_mint",
+          "relations": [
+            "rule"
+          ]
+        },
+        {
+          "name": "user_output"
+        },
+        {
+          "name": "output_token_program"
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [
@@ -181,32 +253,67 @@
     {
       "code": 6000,
       "name": "RuleNotActive",
-      "msg": "Rule is not in a state where it can be executed"
+      "msg": "Rule is not in a state where this can happen"
     },
     {
       "code": 6001,
+      "name": "Expired",
+      "msg": "Rule has expired"
+    },
+    {
+      "code": 6002,
+      "name": "NotTriggered",
+      "msg": "Price has not reached the trigger"
+    },
+    {
+      "code": 6003,
       "name": "PriceOutOfRange",
       "msg": "Price is outside the plausible range for this rule"
     },
     {
-      "code": 6002,
+      "code": 6004,
       "name": "BadPrice",
       "msg": "Price must be positive"
     },
     {
-      "code": 6003,
+      "code": 6005,
       "name": "BadThreshold",
       "msg": "Threshold must be between 0 and 100 percent"
     },
     {
-      "code": 6004,
+      "code": 6006,
       "name": "BadAmount",
       "msg": "Amount must be greater than zero"
     },
     {
-      "code": 6005,
+      "code": 6007,
       "name": "BadSlippage",
       "msg": "Slippage cannot exceed 10%"
+    },
+    {
+      "code": 6008,
+      "name": "BadMints",
+      "msg": "Input and output tokens must differ"
+    },
+    {
+      "code": 6009,
+      "name": "NotKeeper",
+      "msg": "Only the Wexel keeper can execute rules"
+    },
+    {
+      "code": 6010,
+      "name": "SettleMissing",
+      "msg": "execute must be followed by settle in the same transaction"
+    },
+    {
+      "code": 6011,
+      "name": "WrongAccount",
+      "msg": "Settle must check the account recorded at execution"
+    },
+    {
+      "code": 6012,
+      "name": "InsufficientOutput",
+      "msg": "The swap delivered less than the minimum"
     }
   ],
   "types": [
@@ -310,6 +417,26 @@
           {
             "name": "triggered_at",
             "type": "i64"
+          },
+          {
+            "name": "input_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "output_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pre_balance",
+            "type": "u64"
+          },
+          {
+            "name": "min_out",
+            "type": "u64"
+          },
+          {
+            "name": "settle_account",
+            "type": "pubkey"
           }
         ]
       }
@@ -333,6 +460,9 @@
           },
           {
             "name": "Cancelled"
+          },
+          {
+            "name": "Settling"
           }
         ]
       }

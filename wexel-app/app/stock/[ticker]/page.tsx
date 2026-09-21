@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Zap } from "lucide-react";
-import { PriceChart } from "@/components/PriceChart";
+import { PriceChart, fmtTime, type ChartView } from "@/components/PriceChart";
 import { BuySheet } from "@/components/BuySheet";
 import { RuleSheet } from "@/components/RuleSheet";
 
@@ -16,6 +16,10 @@ export default function StockDetail({ params }: { params: Promise<{ ticker: stri
 
   const [asset, setAsset] = useState<any>(null);
   const [chart, setChart] = useState<any[]>([]);
+  const [chartReason, setChartReason] = useState("loading");
+  const [chartWindow, setChartWindow] = useState<number | undefined>(undefined);
+  const [view, setView] = useState<ChartView | null>(null);
+  const [scrub, setScrub] = useState<{ t: number; c: number } | null>(null);
   const [range, setRange] = useState("1D");
   const [buying, setBuying] = useState(false);
   const [ruling, setRuling] = useState(false);
@@ -32,10 +36,12 @@ export default function StockDetail({ params }: { params: Promise<{ ticker: stri
 
   useEffect(() => {
     if (!asset?.mint) return;
+    setChartReason("loading");
+    setView(null);
     fetch(`/api/chart?mint=${asset.mint}&range=${range}`)
       .then(r => r.json())
-      .then(d => setChart(d.items ?? []))
-      .catch(() => setChart([]));
+      .then(d => { setChart(d.items ?? []); setChartWindow(d.window); setChartReason(d.reason ?? ""); })
+      .catch(() => { setChart([]); setChartReason("unavailable"); });
   }, [asset?.mint, range]);
 
   if (!asset) {
@@ -48,7 +54,8 @@ export default function StockDetail({ params }: { params: Promise<{ ticker: stri
   // Both are already percentages — no scaling.
   const change = isPre ? asset.premiumPct : (asset.change24h ?? 0);
   const up = change >= 0;
-  const [whole, cents] = Number(price).toFixed(2).split(".");
+  // While scrubbing the chart, the big number shows that moment's price.
+  const [whole, cents] = Number(scrub ? scrub.c : price).toFixed(2).split(".");
 
   return (
     <>
@@ -96,13 +103,26 @@ export default function StockDetail({ params }: { params: Promise<{ ticker: stri
         </div>
 
         <div style={{ margin: "20px -4px 6px" }}>
-          <PriceChart data={chart} up={up} />
+          {view && (() => {
+            const end = scrub ? scrub.c : view.last.c;
+            const ch = ((end - view.first.c) / view.first.c) * 100;
+            const label = scrub ? `at ${fmtTime(scrub.t, range)}`
+              : view.atLatest ? (range === "1Y" ? "since launch" : `over ${range}`)
+              : `${fmtTime(view.first.t, range)} – ${fmtTime(view.last.t, range)}`;
+            return (
+              <div className="num" style={{ fontSize: 12, color: ch >= 0 ? "var(--good)" : "var(--bad)", margin: "0 4px 6px" }}>
+                {ch >= 0 ? "+" : ""}{ch.toFixed(2)}% <span style={{ color: "var(--faint)" }}>{label}</span>
+              </div>
+            );
+          })()}
+          <PriceChart data={chart} windowSize={chartWindow} reason={chartReason}
+            range={range} onScrub={setScrub} onView={setView} />
         </div>
 
         <div className="seg" style={{ marginBottom: 20 }}>
           {RANGES.map(r => (
             <button key={r} className={range === r ? "on" : ""}
-                    onClick={() => setRange(r)}>{r}</button>
+                    onClick={() => setRange(r)}>{r === "1Y" ? "All" : r}</button>
           ))}
         </div>
 
@@ -141,6 +161,7 @@ export default function StockDetail({ params }: { params: Promise<{ ticker: stri
         <RuleSheet
           ticker={isPre ? asset.symbol : asset.ticker}
           price={price}
+          mint={asset.mint}
           onClose={() => setRuling(false)}
         />
       )}
@@ -151,6 +172,7 @@ export default function StockDetail({ params }: { params: Promise<{ ticker: stri
           mint={asset.mint}
           price={price}
           canAutomate={!isPre}
+          decimals={isPre ? undefined : asset.decimals}
           onClose={() => setBuying(false)}
         />
       )}

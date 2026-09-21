@@ -1,25 +1,21 @@
 import { NextResponse } from "next/server";
+import { fetchJson, UA } from "@/lib/upstream";
 
-const UA = { "User-Agent": "Mozilla/5.0" };
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const { quote, user } = await req.json();
-
-  const res = await fetch("https://lite-api.jup.ag/swap/v1/swap", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...UA },
-    body: JSON.stringify({
-      quoteResponse: quote,
-      userPublicKey: user,
-      wrapAndUnwrapSol: true,
-      dynamicComputeUnitLimit: true,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    return NextResponse.json({ error: text }, { status: 500 });
+  try {
+    const r = await fetchJson("https://lite-api.jup.ag/swap/v1/swap", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...UA },
+      body: JSON.stringify({
+        quoteResponse: quote, userPublicKey: user,
+        wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true,
+      }),
+    }, 10000);
+    return NextResponse.json(r);
+  } catch {
+    return NextResponse.json({ error: "Could not build the trade" }, { status: 502 });
   }
-
-  return NextResponse.json(await res.json());
 }

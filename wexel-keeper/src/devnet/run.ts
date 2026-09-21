@@ -56,6 +56,12 @@ async function main() {
     .signers([rule])
     .rpc();
 
+  if (mode === "create") {
+    console.log(`\n[create] rule ${rule.publicKey.toBase58().slice(0, 8)} · AAPL live $${price.toFixed(2)} · already past trigger`);
+    console.log("  the running keeper should execute it within ~20s");
+    return;
+  }
+
   console.log(`\n[${mode}] rule ${rule.publicKey.toBase58().slice(0, 8)} · AAPL live $${price.toFixed(2)} · buy $10`);
   const before = await bal();
   console.log(`  before   user ${before.usdc} tUSDC · ${before.stock} tAAPLx`);

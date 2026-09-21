@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit",
     "start": "tsx src/keeper.ts",
     "devnet-setup": "tsx src/devnet/setup.ts",
-    "devnet-run": "tsx src/devnet/run.ts"
+    "devnet-run": "tsx src/devnet/run.ts",
+    "devnet-faucet": "tsx src/devnet/faucet.ts",
+    "fork": "tsx src/fork/run.ts"
   },
   "keywords": [],
   "author": "",

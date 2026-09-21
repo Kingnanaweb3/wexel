@@ -2336,6 +2336,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "solana-instructions-sysvar",
+ "spl-token-2022-interface",
 ]
 
 [[package]]

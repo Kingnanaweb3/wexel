@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Greeting } from "@/components/Greeting";
 import { Balance } from "@/components/Balance";
@@ -13,16 +13,23 @@ export default function Markets() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
 
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/stocks").then(r => r.json()).catch(() => []),
-      fetch("/api/prestocks").then(r => r.json()).catch(() => []),
-    ]).then(([s, p]) => {
-      setStocks(Array.isArray(s) ? s : []);
-      setPre(Array.isArray(p) ? p : []);
-      setLoading(false);
-    });
+  const [failed, setFailed] = useState({ stocks: false, pre: false });
+
+  // Each list loads on its own: PreStocks being down never hides stocks.
+  const loadMarkets = useCallback(() => {
+    setLoading(true);
+    fetch("/api/stocks")
+      .then(r => (r.ok ? r.json() : Promise.reject()))
+      .then(s => { setStocks(Array.isArray(s) ? s : []); setFailed(f => ({ ...f, stocks: false })); })
+      .catch(() => setFailed(f => ({ ...f, stocks: true })))
+      .finally(() => setLoading(false));
+    fetch("/api/prestocks")
+      .then(r => (r.ok ? r.json() : Promise.reject()))
+      .then(p => { setPre(Array.isArray(p) ? p : []); setFailed(f => ({ ...f, pre: false })); })
+      .catch(() => setFailed(f => ({ ...f, pre: true })));
   }, []);
+
+  useEffect(() => { loadMarkets(); }, [loadMarkets]);
 
   useEffect(() => {
     if (!query || query.length < 2 || tab !== "stocks") return;
@@ -147,7 +154,12 @@ export default function Markets() {
                 </Link>
               );
             })}
-            {!list.length && <Muted>Nothing to show.</Muted>}
+            {!list.length && (failed[tab === "stocks" ? "stocks" : "pre"]
+              ? <button onClick={loadMarkets} style={{ width: "100%", padding: "36px 20px", background: "none",
+                  border: 0, color: "var(--warn)", fontSize: 13, cursor: "pointer" }}>
+                  Couldn't load {tab === "stocks" ? "stock prices" : "pre-IPO prices"}. Tap to retry.
+                </button>
+              : <Muted>Nothing to show.</Muted>)}
           </div>
         )}
       </div>

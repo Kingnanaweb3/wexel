@@ -2,6 +2,10 @@ use anchor_lang::prelude::*;
 use anchor_lang::Discriminator;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 use solana_instructions_sysvar as ix_sysvar;
+use spl_token_2022_interface::extension::{
+    scaled_ui_amount::ScaledUiAmountConfig, BaseStateWithExtensions, StateWithExtensions,
+};
+use spl_token_2022_interface::state::Mint as MintState;
 
 declare_id!("4RuFJCqBiGmWee9WTtD91dbGQQiCUjoSkkkqXBvi3Yda");
 
@@ -95,20 +99,24 @@ pub mod wexel_program {
         let in_dec = ctx.accounts.input_mint.decimals;
         let out_dec = ctx.accounts.output_mint.decimals;
 
+        let m_in = ui_multiplier(&ctx.accounts.input_mint.to_account_info(), now);
+        let m_out = ui_multiplier(&ctx.accounts.output_mint.to_account_info(), now);
+
+        // Maths happens in displayed units (what prices are quoted in), then
+        // converts to raw units by dividing by each mint's multiplier.
         let (amount_in, min_out) = match r.action {
-            // Spend USDC. For a dip buy, reported <= trigger, so the user is
-            // guaranteed at least usd / trigger shares, minus slippage.
+            // Spend USDC; receive at least usd / price shares, minus slippage.
             Action::Buy => (
                 spend,
-                (usd / reported_price * keep * 10f64.powi(out_dec as i32)) as u64,
+                (usd / reported_price * keep / m_out * 10f64.powi(out_dec as i32)) as u64,
             ),
-            // Sell shares. The share count comes from the TRIGGER price, so a
-            // keeper can't inflate it by reporting a low price.
+            // Sell usd-worth of shares sized at the TRIGGER price, so a keeper
+            // can't inflate the count by reporting a low price.
             Action::SwapToUsdc => {
                 let shares = usd / trigger;
                 (
-                    (shares * 10f64.powi(in_dec as i32)) as u64,
-                    (shares * reported_price * keep * 10f64.powi(out_dec as i32)) as u64,
+                    (shares / m_in * 10f64.powi(in_dec as i32)) as u64,
+                    (shares * reported_price * keep / m_out * 10f64.powi(out_dec as i32)) as u64,
                 )
             }
         };
@@ -163,6 +171,19 @@ pub mod wexel_program {
         r.status = RuleStatus::Cancelled;
         Ok(())
     }
+}
+
+// Displayed units per raw unit. xStocks use Token-2022's scaled-UI-amount
+// extension (the issuer passes dividends through it), so 1 raw AAPLx can show
+// as 1.0033 AAPLx. Read from the mint itself, so no one can supply a false
+// value. Anything without the extension (USDC) is 1.0.
+fn ui_multiplier(mint: &AccountInfo, now: i64) -> f64 {
+    let Ok(data) = mint.try_borrow_data() else { return 1.0 };
+    let Ok(state) = StateWithExtensions::<MintState>::unpack(&data) else { return 1.0 };
+    let Ok(cfg) = state.get_extension::<ScaledUiAmountConfig>() else { return 1.0 };
+    let switch_at: i64 = cfg.new_multiplier_effective_timestamp.into();
+    let m: f64 = if now >= switch_at { cfg.new_multiplier.into() } else { cfg.multiplier.into() };
+    if m.is_finite() && m > 0.0 { m } else { 1.0 }
 }
 
 fn require_settle_follows(ix_acc: &AccountInfo, rule: Pubkey) -> Result<()> {

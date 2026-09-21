@@ -8,6 +8,7 @@ import { getProgram, fetchMyRules } from "@/lib/program";
 import { livePrices, Quote } from "@/lib/prices";
 import { RuleTrack } from "@/components/RuleTrack";
 import { SwipeRow } from "@/components/SwipeRow";
+import { PermissionCard } from "@/components/PermissionCard";
 
 const ACTIVE = new Set(["watching", "triggered"]);
 
@@ -56,7 +57,7 @@ export default function Rules() {
     setConfirm(null);
     try {
       await getProgram(connection, wallet).methods.cancelRule()
-        .accounts({ rule: r.pubkey, owner: publicKey }).rpc();
+        .accountsPartial({ rule: r.pubkey, owner: publicKey }).rpc();
       setRules(rs => rs.map(x => x.pubkey === r.pubkey ? { ...x, status: "cancelled" } : x));
       flash("Rule cancelled");
     } catch (e: any) {
@@ -96,6 +97,8 @@ export default function Rules() {
 
         {publicKey && !loading && (
           <>
+            <PermissionCard />
+
             <div className="seg" style={{ marginBottom: 14 }}>
               <button className={view === "active" ? "on" : ""} onClick={() => setView("active")}>
                 Active · {active.length}
@@ -157,7 +160,7 @@ export default function Rules() {
                     </div>
 
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      {isActive && away !== null ? (
+                      {r.status === "watching" && away !== null ? (
                         <>
                           <div className="num" style={{
                             fontSize: 17, color: away < 2 ? "var(--warn)" : "var(--ink)",
@@ -266,7 +269,7 @@ function expiresIn(unix: number) {
 // Soft filled pill — no outline, matching the selection style.
 function Status({ status }: { status: string }) {
   const tone = ({
-    watching: "var(--accent)", triggered: "var(--warn)",
+    watching: "var(--accent)", triggered: "var(--warn)", settling: "var(--warn)",
     executed: "var(--good)", expired: "var(--faint)", cancelled: "var(--faint)",
   } as Record<string, string>)[status] ?? "var(--faint)";
 
