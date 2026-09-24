@@ -109,7 +109,7 @@ export default function Rules() {
             </div>
 
             {!shown.length && view === "active" && (
-              <Link href="/" className="card" style={{
+              <Link href="/markets" className="card" style={{
                 display: "flex", alignItems: "center", gap: 13,
                 textDecoration: "none", color: "inherit",
               }}>
@@ -254,9 +254,9 @@ export default function Rules() {
 }
 
 function label(r: any) {
-  if (r.direction === "down" && r.action === "buy") return `Buy the dip −${r.thresholdPct}%`;
-  if (r.direction === "up") return `Take profit +${r.thresholdPct}%`;
-  return `Stop loss −${r.thresholdPct}%`;
+  const buy = r.action === "buy";
+  if (r.direction === "down") return buy ? `Buy the dip −${r.thresholdPct}%` : `Stop loss −${r.thresholdPct}%`;
+  return buy ? `Buy breakout +${r.thresholdPct}%` : `Take profit +${r.thresholdPct}%`;
 }
 
 function expiresIn(unix: number) {

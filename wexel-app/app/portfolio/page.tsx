@@ -1,19 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, DollarSign } from "lucide-react";
 import { WalletActions } from "@/components/WalletActions";
 import { PermissionCard } from "@/components/PermissionCard";
+import { AssetRow, BigUsd, Change, Chips } from "@/components/ui";
+import { fmtAmount } from "@/lib/format";
 
-const SWATCH = ["#2F7FFF", "#5DD68E", "#E0A85A", "#B98CFF", "#F87171", "#56C2E6"];
+const FILTERS = [
+  { id: "all", label: "All" },
+  { id: "stocks", label: "Stocks" },
+  { id: "pre", label: "Pre-IPO" },
+  { id: "crypto", label: "Crypto" },
+];
 
-export default function Portfolio() {
+export default function Wallet() {
   const { publicKey } = useWallet();
   const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState("all");
 
   const load = useCallback(async () => {
     if (!publicKey) return;
@@ -34,17 +41,27 @@ export default function Portfolio() {
 
   const holdings: any[] = data?.holdings ?? [];
   const total = data?.totalUsd ?? 0;
-  const stocks = holdings.filter(h => h.isStock).reduce((s, h) => s + h.valueUsd, 0);
-  const cash = holdings.filter(h => h.isStable).reduce((s, h) => s + h.valueUsd, 0);
-  const [whole, cents] = total.toFixed(2).split(".");
+  const cash = holdings.filter((h) => h.isStable).reduce((s, h) => s + h.valueUsd, 0);
+  const dayChange = holdings.reduce((s, h) =>
+    s + (h.change24h ? h.valueUsd * (h.change24h / (100 + h.change24h)) : 0), 0);
+
+  // Cash has its own line, so positions are everything else.
+  const positions = useMemo(() => holdings.filter((h) => !h.isStable).filter((h) =>
+    filter === "all" ? true
+    : filter === "stocks" ? h.isStock && !h.isPre
+    : filter === "pre" ? h.isPre
+    : !h.isStock), [holdings, filter]);
 
   return (
     <>
-      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "22px 20px 16px" }}>
-        <h1 style={{ fontSize: 26 }}>Wallet</h1>
+      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px 0" }}>
+        <h1 style={{ fontSize: 21 }}>Wallet</h1>
         {publicKey && (
-          <button onClick={load} className="icon-chip" style={{ border: 0, cursor: "pointer" }}>
-            <RefreshCw size={15} style={{ animation: loading ? "spin 1s linear infinite" : "none" }} />
+          <button onClick={load} aria-label="Refresh" style={{
+            width: 38, height: 38, borderRadius: 999, border: 0, cursor: "pointer",
+            background: "var(--raised)", color: "var(--ink)", display: "grid", placeItems: "center",
+          }}>
+            <RefreshCw size={16} style={{ animation: loading ? "spin 1s linear infinite" : "none" }} />
           </button>
         )}
       </header>
@@ -54,99 +71,68 @@ export default function Portfolio() {
 
         {publicKey && (
           <>
-            {failed && (
-              <button onClick={load} className="card" style={{
-                width: "100%", marginBottom: 14, textAlign: "left", cursor: "pointer",
-                color: "var(--warn)", fontSize: 13, border: 0,
-              }}>
-                {data ? "Couldn't refresh — showing your last known balances. Tap to retry."
-                      : "Couldn't reach Solana. Tap to retry."}
-              </button>
-            )}
-
-            {data && (
-              <div className="card" style={{ padding: 18, marginBottom: 18 }}>
-                <div style={{ fontSize: 13.5, color: "var(--muted)", marginBottom: 10 }}>Total value</div>
-                <div className="num" style={{ fontSize: 34, lineHeight: 1, marginBottom: 18 }}>
-                  ${Number(whole).toLocaleString()}
-                  <span style={{ fontSize: 19, color: "var(--faint)" }}>.{cents}</span>
-                </div>
-
-                {total > 0 && (
-                  <div style={{ display: "flex", height: 8, borderRadius: 999, overflow: "hidden", gap: 2, marginBottom: 16 }}>
-                    {holdings.filter(h => h.share > 0.5).map((h, i) => (
-                      <div key={h.account} style={{ width: `${h.share}%`, background: SWATCH[i % SWATCH.length] }} />
-                    ))}
+            <div style={{ padding: "22px 0 22px" }}>
+              {failed && !data ? (
+                <button onClick={load} style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: "var(--warn)", fontSize: 14 }}>
+                  Couldn't reach Solana · tap to retry
+                </button>
+              ) : (
+                <>
+                  <BigUsd value={total} size={36} />
+                  <div className="num" style={{ fontSize: 14, fontWeight: 500, marginTop: 10,
+                                                color: dayChange >= 0 ? "var(--good)" : "var(--bad)" }}>
+                    {dayChange >= 0 ? "+" : "-"}${Math.abs(dayChange).toFixed(2)}
+                    <span style={{ color: "var(--faint)", marginLeft: 8 }}>24h</span>
                   </div>
-                )}
+                  {failed && <div style={{ fontSize: 12, color: "var(--warn)", marginTop: 8 }}>Showing last known balances.</div>}
+                  {data?.partial && <div style={{ fontSize: 12, color: "var(--warn)", marginTop: 8 }}>Prices delayed — some values may be missing.</div>}
+                </>
+              )}
+            </div>
 
-                <Split label="Stocks" value={stocks} total={total} />
-                <Split label="Crypto" value={total - stocks - cash} total={total} />
-                <Split label="Cash" value={cash} total={total} />
+            <WalletActions onSent={load} />
 
-                {data.partial && (
-                  <div style={{ fontSize: 12, color: "var(--warn)", marginTop: 10 }}>
-                    Prices delayed — some values may be missing.
-                  </div>
-                )}
+            {/* Cash */}
+            <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "26px 0 22px" }}>
+              <div style={{ width: 54, height: 54, borderRadius: "50%", background: "var(--raised)",
+                            display: "grid", placeItems: "center", flexShrink: 0 }}>
+                <DollarSign size={24} />
               </div>
+              <div>
+                <div style={{ fontSize: 14, color: "var(--muted)" }}>Total cash</div>
+                <div className="num" style={{ fontSize: 18, fontWeight: 600, marginTop: 2 }}>
+                  ${cash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+            </div>
+
+            {/* Positions */}
+            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 14 }}>
+              Positions <span style={{ color: "var(--faint)", fontWeight: 500 }}>({holdings.filter((h) => !h.isStable).length})</span>
+            </div>
+            <Chips items={FILTERS} value={filter} onChange={setFilter} />
+
+            <div style={{ paddingTop: 8 }}>
+              {!data && !failed && <Muted>Reading your wallet…</Muted>}
+              {data && !positions.length && <Muted>{filter === "all" ? "No positions yet." : "Nothing in this category."}</Muted>}
+              {positions.map((h) => (
+                <AssetRow key={h.account}
+                  href={h.isPre ? `/stock/${h.symbol}?pre=1` : h.isStock ? `/stock/${h.symbol.replace(/x$/, "")}` : "/portfolio"}
+                  logo={h.icon} title={h.name === "Unknown token" ? h.symbol : h.name}
+                  sub={`${fmtAmount(h.amount)} ${h.symbol}`}
+                  price={h.price > 0 ? `$${h.valueUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+                  change={<Change pct={h.isPre || !h.price ? null : h.change24h} />} />
+              ))}
+            </div>
+
+            {holdings.some((h) => h.price === 0) && (
+              <p style={{ fontSize: 12, color: "var(--faint)", lineHeight: 1.6, margin: "10px 0 0" }}>
+                Tokens marked — have no market price. On devnet that's most test tokens;
+                they're shown so nothing in your wallet is hidden.
+              </p>
             )}
 
-            <div style={{ marginBottom: 20 }}><WalletActions onSent={load} /></div>
-            <PermissionCard />
-
-            {data && (
-              <>
-                <div className="label" style={{ marginBottom: 10 }}>Holdings · {holdings.length}</div>
-                {!holdings.length && <Muted>This wallet holds nothing yet.</Muted>}
-                {holdings.length > 0 && (
-                  <div className="card" style={{ padding: "2px 15px" }}>
-                    {holdings.map((h, i) => {
-                      const inner = (
-                        <>
-                          <div style={{ position: "relative", flexShrink: 0 }}>
-                            {h.icon
-                              ? <img src={h.icon} alt="" width={36} height={36} style={{ borderRadius: 11 }} />
-                              : <div className="icon-chip" style={{ width: 36, height: 36, fontSize: 11 }}>{h.symbol.slice(0, 3)}</div>}
-                            <span style={{ position: "absolute", bottom: -1, right: -1, width: 10, height: 10, borderRadius: "50%",
-                                           background: SWATCH[i % SWATCH.length], border: "2px solid var(--surface)" }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div className="mono" style={{ fontSize: 13.5 }}>{h.symbol}</div>
-                            <div className="num" style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 2 }}>
-                              {h.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}
-                              {h.price > 0 && ` · $${h.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
-                            </div>
-                          </div>
-                          <div style={{ textAlign: "right" }}>
-                            <div className="num" style={{ fontSize: 14 }}>
-                              {h.price > 0 ? `$${h.valueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : "—"}
-                            </div>
-                            <div className="num" style={{ fontSize: 11, color: "var(--faint)", marginTop: 2 }}>{h.share.toFixed(1)}%</div>
-                          </div>
-                        </>
-                      );
-                      const style: React.CSSProperties = {
-                        display: "flex", alignItems: "center", gap: 12, padding: "13px 0",
-                        textDecoration: "none", color: "inherit",
-                        borderBottom: i < holdings.length - 1 ? "1px solid var(--line)" : "none",
-                      };
-                      return h.isStock
-                        ? <Link key={h.account} href={h.isPre ? `/stock/${h.symbol}?pre=1` : `/stock/${h.symbol.replace(/x$/, "")}`} style={style}>{inner}</Link>
-                        : <div key={h.account} style={style}>{inner}</div>;
-                    })}
-                  </div>
-                )}
-                {holdings.some(h => h.price === 0) && (
-                  <p style={{ fontSize: 11.5, color: "var(--faint)", lineHeight: 1.6, marginTop: 12 }}>
-                    Tokens marked — have no market price. On devnet that's most test tokens;
-                    they're shown so nothing in your wallet is hidden.
-                  </p>
-                )}
-              </>
-            )}
-
-            {!data && !failed && <Muted>Reading your wallet…</Muted>}
+            <div style={{ marginTop: 26 }}><PermissionCard /></div>
           </>
         )}
       </div>
@@ -154,19 +140,6 @@ export default function Portfolio() {
   );
 }
 
-function Split({ label, value, total }: { label: string; value: number; total: number }) {
-  const pct = total > 0 ? (value / total) * 100 : 0;
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0" }}>
-      <span style={{ color: "var(--muted)" }}>{label}</span>
-      <span className="num">
-        ${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-        <span style={{ color: "var(--faint)", marginLeft: 8 }}>{pct.toFixed(0)}%</span>
-      </span>
-    </div>
-  );
-}
-
 function Muted({ children }: { children: React.ReactNode }) {
-  return <div style={{ textAlign: "center", padding: "46px 20px", color: "var(--faint)", fontSize: 13, lineHeight: 1.6 }}>{children}</div>;
+  return <div style={{ textAlign: "center", padding: "40px 10px", color: "var(--faint)", fontSize: 13 }}>{children}</div>;
 }

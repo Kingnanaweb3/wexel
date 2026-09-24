@@ -1,0 +1,33 @@
+{
+  "name": "wexel-keeper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "keeper": "tsx src/keeper.ts",
+    "test-trigger": "tsx src/test-trigger.ts",
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/keeper.ts",
+    "devnet-setup": "tsx src/devnet/setup.ts",
+    "devnet-run": "tsx src/devnet/run.ts",
+    "devnet-faucet": "tsx src/devnet/faucet.ts",
+    "fork": "tsx src/fork/run.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.99.0",
+    "bs58": "^6.0.0",
+    "dotenv": "^18.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

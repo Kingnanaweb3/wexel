@@ -62,7 +62,7 @@ export function PermissionCard() {
 
   return (
     <>
-      <div className="card" style={{ marginBottom: 18 }}>
+      <div style={{ padding: "18px 0", marginBottom: 8, borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
           <ShieldCheck size={17} color={items.length ? "var(--good)" : "var(--faint)"} />
           <span style={{ fontSize: 14, fontWeight: 500 }}>Spending permission</span>

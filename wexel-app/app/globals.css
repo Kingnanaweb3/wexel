@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,100..1000&family=Geist+Mono:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap');
 @import "tailwindcss";
 
 /* LIGHT (default) — mirrors the reference: soft grey page, white cards */
@@ -231,3 +231,42 @@ input[type=number] { -moz-appearance: textfield; }
 
 button:focus, a:focus { outline: none; }
 button:focus-visible, a:focus-visible { outline: 2px solid var(--selected); outline-offset: 2px; }
+
+/* ---- v2 look: Geist, cream on near-black, app-like ---- */
+:root {
+  --sans: 'Geist', -apple-system, system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+  --accent: #4B63F2;
+  --line2: rgba(0,0,0,.12);
+  --dot: rgba(0,0,0,.07);
+}
+[data-theme="dark"] {
+  --bg: #06060B;
+  --surface: #111118;
+  --raised: #1A1A23;
+  --ink: #FBFBF7;
+  --muted: #9C9CA8;
+  --faint: #62626F;
+  --line: rgba(255,255,255,.07);
+  --line2: rgba(255,255,255,.12);
+  --accent: #5468F5;
+  --dot: rgba(255,255,255,.07);
+  --good: #3FD37F;
+  --bad: #FF5B4E;
+}
+
+body { font-family: var(--sans); letter-spacing: -0.01em; }
+h1, h2, h3 { font-family: var(--sans); font-weight: 600; letter-spacing: -0.025em; line-height: 1.1; }
+.num { letter-spacing: -0.02em; }
+
+.btn { font-size: 15px; font-weight: 600; padding: 15px 18px; border-radius: 15px; }
+.btn-primary { background: var(--accent); color: #fff; border-color: transparent; }
+
+/* iOS zooms into any text box under 16px. */
+input, select, textarea { font-size: 16px !important; }
+
+/* App-like: no pinch or double-tap zoom, no bounce, no sideways drift. */
+html { touch-action: pan-x pan-y; overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
+html, body { overflow-x: clip; max-width: 100%; }
+body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+img { -webkit-user-drag: none; user-select: none; }

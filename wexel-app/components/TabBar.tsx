@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Home, Wallet, Zap, User } from "lucide-react";
 
 const TABS = [
-  { href: "/", label: "Markets", Icon: Home },
+  { href: "/markets", label: "Markets", Icon: Home },
   { href: "/portfolio", label: "Wallet", Icon: Wallet },
   { href: "/rules", label: "Rules", Icon: Zap },
   { href: "/profile", label: "Profile", Icon: User },
@@ -13,11 +13,12 @@ const TABS = [
 
 export function TabBar() {
   const path = usePathname();
+  if (path === "/" || path.startsWith("/stock")) return null;
 
   return (
     <nav className="tabbar">
       {TABS.map(({ href, label, Icon }) => {
-        const on = href === "/" ? path === "/" : path.startsWith(href);
+        const on = path.startsWith(href);
         return (
           <Link key={href} href={href} className={on ? "on" : ""}>
             <Icon size={18} strokeWidth={2} />
